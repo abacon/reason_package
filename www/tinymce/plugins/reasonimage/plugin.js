@@ -89,7 +89,9 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
    * need to do in order to get the plugin up and running.
    */
   reasonPlugins.reasonImage = function(controlSelectors, placeholderSelector) {
-    this.chunk_size = 6;
+    this.chunk_size = 1000;
+    this.page_size = 5;
+    this.page = 1;
     this.srcControl = reasonPlugins.getControl(controlSelectors.src);
     this.altControls = tinymce.map(controlSelectors.alt, function(item) {
       return reasonPlugins.getControl(item);
@@ -116,7 +118,7 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
   reasonPlugins.reasonImage.prototype.insertReasonUI = function() {
     var holderDiv;
     this.UI = this.targetPanel.getEl();
-    var css = '.items_chunk { text-align: center; height: 300px; overflow-y: scroll; white-space: normal;} .image_item {width: 190px; padding: 5px; display: inline-block;} .items_chunk .name, .items_chunk .description {display: block; white-space: normal;} .items_chunk .description {font-size: 0.9em;}' ,
+    var css = 'button:disabled, button:disabled:hover, button:disabled:focus, button[disabled=true] { background-image: linear-gradient(to bottom, rgb(222, 222, 222), rgb(184, 184, 184)) !important; color: #aaaaaa; } .items_chunk { text-align: center; height: 300px; overflow-y: scroll; white-space: normal;} .image_item {width: 190px; padding: 5px; display: inline-block;} .items_chunk .name, .items_chunk .description {display: block; white-space: normal;} .items_chunk .description {font-size: 0.9em;}' ,
     head = document.getElementsByTagName('head')[0],
     style = document.createElement('style');
 
@@ -162,11 +164,23 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
     });
 
     tinymce.DOM.bind(this.prevButton, 'click', function(e) {
-      self.renderReasonImages(self.page - 1 || 1);
+      var begin, end;
+
+      end = ((self.page - 1) * self.page_size);
+      begin = end - self.page_size;
+
+      self.page -= 1;
+      self.display_images(self.displayedItems.slice(begin, end));
     });
 
     tinymce.DOM.bind(this.nextButton, 'click', function(e) {
-      self.renderReasonImages(self.page + 1);
+      var begin, end;
+
+      begin = (self.page * self.page_size);
+      end = (begin + self.page_size);
+
+      self.page += 1;
+      self.display_images(self.displayedItems.slice(begin, end));
     });
 
     this.sizeControl.on('select', function (e) {
@@ -181,15 +195,18 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
     tinymce.DOM.bind(this.searchBox, 'keyup', function(e) {
       var target = e.target || window.event.srcElement;
       reasonPlugins.delay(function() {
-        if (!target.value) {
-          self.renderReasonImages(1);
-          return;
+        if (target.value) {
+          self.result = self.findImagesWithText(target.value);
+          self.displayedItems = self.result;
+          self.display_images();
+        } else {
+          self.displayedItems = self.items;
+          self.display_images();
         }
-        self.results = self.findImagesWithText(target.value);
-        self.display_images(self.results);
       }, 200);
     });
   };
+
 
   reasonPlugins.reasonImage.prototype.findImagesWithText = function (q) {
     var result = [];
@@ -197,10 +214,8 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
     var regex = new RegExp(q, "i");
     for (var i in list) {
       if (list.hasOwnProperty(i)) {
-        for (var j in list[i]) {
-          if (list[i][j].hasText(regex)) {
-            result.push(list[i][j]);
-          }
+        if (list[i].hasText(regex)) {
+          result.push(list[i]);
         }
       }
     }
@@ -227,21 +242,18 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
   };
 
   // TODO: Right now you can click past the last page and some weirdness happens.
-  reasonPlugins.reasonImage.prototype.renderReasonImages = function (page) {
-    page = !page ? 1 : page;
-    this.page = page;
-    if (typeof this.items[page] !== 'undefined') {
-      this.display_images(this.items[page]);
-    } else {
-      this.fetch_images(page, function() {
-        this.display_images(this.items[page]);
-      });
-    }
-
+  reasonPlugins.reasonImage.prototype.renderReasonImages = function () {
+      this.fetch_images(1, function() {
+        this.displayedItems = this.items;
+        this.display_images();
+    });
   };
 
   reasonPlugins.reasonImage.prototype.display_images = function (images_array) {
     var imagesHTML = "";
+
+    images_array = (!images_array && this.displayedItems) ? this.displayedItems.slice(0, this.page_size) : images_array;
+
 
     for (var i in images_array) {
       i = images_array[i];
@@ -249,11 +261,17 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
     }
 
     this.imagesListBox.innerHTML = imagesHTML;
+    this.update_pagination();
   };
+
+  reasonPlugins.reasonImage.prototype.update_pagination = function() {
+    var num_of_pages = Math.ceil(this.displayedItems.length/this.page_size);
+    this.nextButton.disabled = (this.page + 1 > num_of_pages);
+    this.prevButton.disabled = (this.page - 1 <= 0);
+  }
 
   reasonPlugins.reasonImage.prototype.parse_images = function(response, page) {
     var parsed_response = JSON.parse(response), response_items = parsed_response.items;
-    var items_to_add = [];
 
     this.totalItems = parsed_response.count;
 
@@ -265,17 +283,16 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
       item.pubDate = response_items[i].pubDate;
       item.lastMod = response_items[i].lastMod;
       item.URLs = {'thumbnail': response_items[i].thumbnail, 'full': response_items[i].link};
-      items_to_add.push(item);
+      this.items.push(item);
     }
-    this.items[page] = items_to_add;
   };
 
-  reasonPlugins.reasonImage.prototype.fetch_images = function (page, callback) {
+  reasonPlugins.reasonImage.prototype.fetch_images = function (chunk, callback) {
 
     if (!this.json_url)
       throw "You need to set a URL for the dialog to fetch JSON from.";
 
-    var offset = ((page - 1) * this.chunk_size), url;
+    var offset = ((chunk - 1) * this.chunk_size), url;
 
     if (typeof this.json_url === 'function')
       {
@@ -286,10 +303,10 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
       tinymce.util.XHR.send({
         "url": url,
         "success": function(response) {
-          this.parse_images(response, page);
+          this.parse_images(response, chunk);
           callback.call(this);
-          if (page+1 <= this.totalItems/this.chunk_size)
-            this.fetch_images(page+1, function() {});
+          if (chunk+1 <= this.totalItems/this.chunk_size)
+            this.fetch_images(chunk+1, function() {});
         },
         "success_scope": this
       });
