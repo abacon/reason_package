@@ -207,7 +207,12 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
     });
   };
 
-
+  /**
+   * Searches this.items for ReasonImageDialogItems that contain a search
+   * term in their keywords, title, or description.
+   * @param String q The string to look for in items
+   * @return Array an array of matching ReasonImageDialogItems
+   **/
   reasonPlugins.reasonImage.prototype.findImagesWithText = function (q) {
     var result = [];
     var list = this.items;
@@ -225,6 +230,7 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
   /**
    * Links reason controls (selecting an image, writing alt text) to hidden
    * tinyMCE elements.
+   * @param HTMLDivElement image_item the div that contains the image
    */
   reasonPlugins.reasonImage.prototype.selectImage = function (image_item) {
     var src = image_item.getElementsByTagName('IMG')[0].src;
@@ -249,11 +255,17 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
     });
   };
 
+  /**
+   * Renders an array of ReasonImageDialogItems to
+   * this.imagesListBox.innerHTML. If there is no array provided,
+   * renders the first page of result from the current context (images or
+   * search results).
+   * @param Array images_array
+   **/
   reasonPlugins.reasonImage.prototype.display_images = function (images_array) {
     var imagesHTML = "";
 
     images_array = (!images_array && this.displayedItems) ? this.displayedItems.slice(0, this.page_size) : images_array;
-
 
     for (var i in images_array) {
       i = images_array[i];
@@ -264,13 +276,23 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
     this.update_pagination();
   };
 
+  /**
+   * Handles enabling/disabling of "Next Page"/"Previous Page" buttons.
+   * Should be called after every new chunk is loaded, page is displayed,
+   * or search result is calculated.
+   **/
   reasonPlugins.reasonImage.prototype.update_pagination = function() {
     var num_of_pages = Math.ceil(this.displayedItems.length/this.page_size);
     this.nextButton.disabled = (this.page + 1 > num_of_pages);
     this.prevButton.disabled = (this.page - 1 <= 0);
   }
 
-  reasonPlugins.reasonImage.prototype.parse_images = function(response, page) {
+  /**
+   * Given a response, constructs ReasonImageDialogItems and pushes
+   * each one onto the this.items array.
+   * @param String response the JSON string that contains the items
+   **/
+  reasonPlugins.reasonImage.prototype.parse_images = function(response) {
     var parsed_response = JSON.parse(response), response_items = parsed_response.items;
 
     this.totalItems = parsed_response.count;
@@ -287,6 +309,15 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
     }
   };
 
+  /**
+   * Fetches all of the images that belong to or are borrowed from a site,
+   * via ajax as a series of chunks of size this.chunk_size, and executes
+   * a callback after the first chunk finishes downloading.
+   * @param Number   chunk    the number of the chunk to get. Used for calculating 
+   *                          offset.
+   * @param Function callback a function to be executed when the chunk has finished
+   *                          being downloaded and parsed.
+   **/
   reasonPlugins.reasonImage.prototype.fetch_images = function (chunk, callback) {
 
     if (!this.json_url)
