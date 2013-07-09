@@ -59,8 +59,8 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
    * @param String selector the 'name' value of a tinymce control
    **/
   reasonPlugins.getControl = function (selector) {
-    return tinymce.activeEditor.windowManager.windows[0].find('#'+selector)[0];
-  }
+    return tinymce.activeEditor.windowManager.windows[0].find('#' + selector)[0];
+  };
 
   /**
    * Gets a reference to tinyMCE's representation of the panel that holds the filePicker.
@@ -210,7 +210,6 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
   /**
    * Links reason controls (selecting an image, writing alt text) to hidden
    * tinyMCE elements.
-   * TODO: add alt tag things.
    */
   reasonPlugins.reasonImage.prototype.selectImage = function (image_item) {
     var src = image_item.getElementsByTagName('IMG')[0].src;
@@ -346,8 +345,8 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
 tinymce.PluginManager.add('reasonimage', function(editor, url) {
 
 	function showDialog() {
-                var old_file_browser_callback = editor.settings.file_browser_callback;
-                editor.settings.file_browser_callback = reasonPlugins;
+		var old_file_browser_callback = editor.settings.file_browser_callback;
+		editor.settings.file_browser_callback = reasonPlugins;
 		var win, data, dom = editor.dom, imgElm = editor.selection.getNode();
 		var width, height;
 
