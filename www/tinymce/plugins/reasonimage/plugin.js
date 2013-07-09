@@ -362,8 +362,6 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
 tinymce.PluginManager.add('reasonimage', function(editor, url) {
 
 	function showDialog() {
-		var old_file_browser_callback = editor.settings.file_browser_callback;
-		editor.settings.file_browser_callback = reasonPlugins;
 		var win, data, dom = editor.dom, imgElm = editor.selection.getNode();
 		var width, height;
 
@@ -438,8 +436,7 @@ tinymce.PluginManager.add('reasonimage', function(editor, url) {
           }
         }
       });
-        editor.settings.file_browser_callback = old_file_browser_callback;
-	}
+  }
 
 	editor.addButton('reasonimage', {
 		icon: 'image',
