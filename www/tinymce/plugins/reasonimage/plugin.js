@@ -20,6 +20,13 @@
   * TODO: We need to account for having multiple editors per page. I think that maybe
   *       we should cache a reference to the current editor's plugin and check if activeEditor
   *       is the same as the last time reasonPlugins was called?
+  * TODO: Change reasonPlugins.getPanel to keep going up elements until we find a 
+  *       parent of type panel to make it a little more robust.
+  * TODO: insertReasonUI should insert a tinymce control of type panel w/ settings.html, maybe?
+  * TODO: the plugin should use a real CSS file (not js-css in insertReasonUI)
+  * TODO: to style each element, insertReasonUI should copy styles/classes from native tinymce
+  *       elements.
+  * TODO: use reason_http_base_path to reduce size of JSON being requested.
   *
   * @param Object controlSelectors The items to which the the picker will be bound
   * @param String targetPanelSelector The item to which the the picker will be bound
@@ -70,7 +77,6 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
    * @param string selector the selector for the file browser control
    **/
   reasonPlugins.getPanel = function (control) {
-    // TODO: We can keep going up until we find a parent of type panel to make this a little more robust.
     return control.parent().parent();
   };
 
@@ -133,9 +139,7 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
     }
 
     head.appendChild(style);
-    // I should probably be using documentFragments here. Eh.
     holderDiv = document.createElement("div");
-    // TODO this makes me incredibly sad.
     var search = '<div style="margin-left: 20px; margin-top: 20px; width: 660px; height: 30px;" class="mce-container-body mce-abs-layout"><div id="mce_51-absend" class="mce-abs-end"></div><label style="line-height: 18px; left: 0px; top: 6px; width: 122px; height: 18px;" id="mce_52" class="mce-widget mce-label mce-first mce-abs-layout-item">Search:</label><input style="left: 122px; top: 0px; width: 528px; height: 28px;" id="searchyThing" class="reasonImageSearch mce-textbox mce-last mce-abs-layout-item" value="" hidefocus="true" size="40"></div>';
     holderDiv.innerHTML = '<div class="reasonImage">' + search + '<button class="mce-btn prevImagePage" type="button">Previous</button><button class="mce-btn nextImagePage">Next</button><div class="items_chunk"> </div></div>';
 
@@ -190,10 +194,12 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
       self.setImageSize(self.sizeControl.value());
     });
 
-    // TODO This could be a little nicer...
-    // TODO I don't think binding both to the selectImage is needed if this is here, too...
-    this.altControls[0].on('change', function(e) {self.altControls[1].value(self.altControls[0].value()); });
-    this.altControls[1].on('change', function(e) {self.altControls[0].value(self.altControls[1].value()); });
+    this.altControls[0].on('change', function(e) {
+      self.altControls[1].value(self.altControls[0].value());
+    });
+    this.altControls[1].on('change', function(e) {
+      self.altControls[0].value(self.altControls[1].value());
+    });
 
     this.alignControls[0].on('select', function(e) {
       self.alignControls[1].value(e.control.value());
@@ -437,8 +443,6 @@ tinymce.PluginManager.add('reasonimage', function(editor, url) {
           minHeight: "525",
           items: [
             {name: 'alt_2', type: 'textbox', size: 40, label: 'Description'},
-            // TODO: This needs a default value or something. tinymce displays the top item
-            //       but doesn't count it as selected.
             {name: 'size', type: 'listbox', label: "Size", values: [
               {text: 'Thumbnail', value: 'thumb'},
               {text: 'Full', value: 'full'}
