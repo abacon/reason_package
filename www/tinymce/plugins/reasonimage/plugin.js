@@ -36,8 +36,7 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
   var currentReasonPlugin;
 
   if (type === "image") {
-    currentReasonPlugin = new reasonPlugins.reasonImage(controlSelectors, targetPanelSelector);
-    //TODO: caching here?
+    return new reasonPlugins.reasonImage(controlSelectors, targetPanelSelector);
   }
   else if (type === "link") {
     currentReasonPlugin = '';
@@ -121,8 +120,6 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
   /**
    * Prepends the reason controls to the tinyMCE panel specified by
    * this.targetPanel.
-   *
-   * TODO: Make this a tinymce control of type panel and settings.html
    **/
   reasonPlugins.reasonImage.prototype.insertReasonUI = function() {
     var holderDiv;
@@ -345,6 +342,8 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
    *                          being downloaded and parsed.
    **/
   reasonPlugins.reasonImage.prototype.fetch_images = function (chunk, callback) {
+    if (this.closed)
+      return;
 
     if (!this.json_url)
       throw "You need to set a URL for the dialog to fetch JSON from.";
@@ -419,7 +418,7 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
 tinymce.PluginManager.add('reasonimage', function(editor, url) {
 
 	function showDialog() {
-		var win, data, dom = editor.dom, imgElm = editor.selection.getNode();
+		var win, data, dom = editor.dom, imgElm = editor.selection.getNode(), reasonImagesPlugin;
 		var width, height;
 
 		if (imgElm.nodeName == "IMG" && !imgElm.getAttribute('data-mce-object')) {
@@ -430,6 +429,8 @@ tinymce.PluginManager.add('reasonimage', function(editor, url) {
 		} else {
 			imgElm = null;
 		}
+
+    tinymce.activeEditor = editor;
 
     win = editor.windowManager.open({
         title: 'Add an image',
@@ -491,7 +492,7 @@ tinymce.PluginManager.add('reasonimage', function(editor, url) {
             align: ['align', 'align_2'],
             size: 'size'
           };
-          reasonPlugins(controls_to_bind, target_panel,  'image', e);
+          reasonImagePlugin = reasonPlugins(controls_to_bind, target_panel,  'image', e);
         },
         onSubmit: function(e) {
           var data = win.toJSON();
@@ -506,6 +507,12 @@ tinymce.PluginManager.add('reasonimage', function(editor, url) {
           } else {
             editor.insertContent(dom.createHTML('img', data));
           }
+
+          reasonImagePlugin.closed = true;
+        },
+        onClose: function(e) {
+
+          reasonImagePlugin.closed = true;
         }
       });
   }
