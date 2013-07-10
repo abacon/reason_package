@@ -90,7 +90,7 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
    */
   reasonPlugins.reasonImage = function(controlSelectors, placeholderSelector) {
     this.chunk_size = 1000;
-    this.page_size = 5;
+    this.page_size = 6;
     this.page = 1;
     this.srcControl = reasonPlugins.getControl(controlSelectors.src);
     this.altControls = tinymce.map(controlSelectors.alt, function(item) {
@@ -121,7 +121,7 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
   reasonPlugins.reasonImage.prototype.insertReasonUI = function() {
     var holderDiv;
     this.UI = this.targetPanel.getEl();
-    var css = 'button:disabled, button:disabled:hover, button:disabled:focus, button[disabled=true] { background-image: linear-gradient(to bottom, rgb(222, 222, 222), rgb(184, 184, 184)) !important; color: #aaaaaa; } .items_chunk { text-align: center; height: 300px; overflow-y: scroll; white-space: normal;} .image_item {width: 190px; padding: 5px; display: inline-block;} .items_chunk .name, .items_chunk .description {display: block; white-space: normal;} .items_chunk .description {font-size: 0.9em;}' ,
+    var css = 'button:disabled, button:disabled:hover, button:disabled:focus, button[disabled=true] { background-image: linear-gradient(to bottom, rgb(222, 222, 222), rgb(184, 184, 184)) !important; color: #aaaaaa; } .items_chunk { text-align: center; height: 300px; white-space: normal;} .image_item {width: 190px; padding: 5px; display: inline-block;} .items_chunk .name, .items_chunk .description {display: block; white-space: normal;} .items_chunk .description {font-size: 0.9em;}' ,
     head = document.getElementsByTagName('head')[0],
     style = document.createElement('style');
 
@@ -224,9 +224,9 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
    * @return Array an array of matching ReasonImageDialogItems
    **/
   reasonPlugins.reasonImage.prototype.findImagesWithText = function (q) {
-    var result = [];
-    var list = this.items;
-    var regex = new RegExp(q, "i");
+    var result = [],
+        list = this.items,
+        regex = new RegExp(q, "i");
     for (var i in list) {
       if (list.hasOwnProperty(i)) {
         if (list[i].hasText(regex)) {
@@ -252,12 +252,22 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
 
   reasonPlugins.reasonImage.prototype.setImageSize = function (size) {
     this.imageSize = size;
-    if (this.srcControl.value() && this.srcControl.value().search("_tn.jpg") != -1) {
-      this.srcControl.value(this.srcControl.value().replace("_tn", "_orig"));
+    var curVal = this.srcControl.value(),
+        reason_http_base_path = tinymce.activeEditor.settings.reason_http_base_path;
+    if (!curVal || curVal.search(reason_http_base_path) == -1)
+      return;
+    if (size == "full") {
+      if (curVal.search("_tn.") != -1) {
+        this.srcControl.value(curVal.replace("_tn", ""));
+      }
+    } else if (curVal.search("_tn.") == -1) {
+      var add_from = curVal.lastIndexOf('.'),
+          string;
+      string = curVal.substr(0, add_from) + "_tn" + curVal.substr(add_from);
+      this.srcControl.value(string);
     }
   };
 
-  // TODO: Right now you can click past the last page and some weirdness happens.
   reasonPlugins.reasonImage.prototype.renderReasonImages = function () {
       this.fetch_images(1, function() {
         this.displayedItems = this.items;
@@ -295,7 +305,7 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
     var num_of_pages = Math.ceil(this.displayedItems.length/this.page_size);
     this.nextButton.disabled = (this.page + 1 > num_of_pages);
     this.prevButton.disabled = (this.page - 1 <= 0);
-  }
+  };
 
   /**
    * Given a response, constructs ReasonImageDialogItems and pushes
@@ -424,7 +434,7 @@ tinymce.PluginManager.add('reasonimage', function(editor, url) {
           name: "reasonImagePanel",
           type: "form",
           minWidth: "700",
-          minHeight: "500",
+          minHeight: "525",
           items: [
             {name: 'alt_2', type: 'textbox', size: 40, label: 'Description'},
             // TODO: This needs a default value or something. tinymce displays the top item
