@@ -96,6 +96,9 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
     this.altControls = tinymce.map(controlSelectors.alt, function(item) {
       return reasonPlugins.getControl(item);
     });
+    this.alignControls = tinymce.map(controlSelectors.align, function(item) {
+      return reasonPlugins.getControl(item);
+    });
     this.sizeControl = reasonPlugins.getControl(controlSelectors.size);
     this.targetPanel = reasonPlugins.getControl(placeholderSelector);
     this.type = "image";
@@ -191,6 +194,13 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
     // TODO I don't think binding both to the selectImage is needed if this is here, too...
     this.altControls[0].on('change', function(e) {self.altControls[1].value(self.altControls[0].value()); });
     this.altControls[1].on('change', function(e) {self.altControls[0].value(self.altControls[1].value()); });
+
+    this.alignControls[0].on('select', function(e) {
+      self.alignControls[1].value(e.control.value());
+    });
+    this.alignControls[1].on('select', function(e) {
+      self.alignControls[0].value(e.control.value());
+    });
 
     tinymce.DOM.bind(this.searchBox, 'keyup', function(e) {
       var target = e.target || window.event.srcElement;
@@ -416,12 +426,17 @@ tinymce.PluginManager.add('reasonimage', function(editor, url) {
           minWidth: "700",
           minHeight: "500",
           items: [
-            {name: 'alt_2', type: 'textbox', size: 40, label: 'Text to display'},
+            {name: 'alt_2', type: 'textbox', size: 40, label: 'Description'},
             // TODO: This needs a default value or something. tinymce displays the top item
             //       but doesn't count it as selected.
             {name: 'size', type: 'listbox', label: "Size", values: [
               {text: 'Thumbnail', value: 'thumb'},
               {text: 'Full', value: 'full'}
+            ]},
+            {name: 'align_2', type: 'listbox', label: "Align", values: [
+              {text: 'None', value: 'none'},
+              {text: 'Left', value: 'left'},
+              {text: 'Right', value: 'right'}
             ]}
           ],
           onchange: function(e) {console.log(!!e.target? e.target.value: e);}
@@ -442,7 +457,13 @@ tinymce.PluginManager.add('reasonimage', function(editor, url) {
                 name: 'alt',
                 type: 'textbox',
                 size: 40,
-                label: 'Text to display'
+                label: 'Description'
+            }, {
+              name: 'align', type: 'listbox', label: "Align", values: [
+                {text: 'None', value: 'none'},
+                {text: 'Left', value: 'left'},
+                {text: 'Right', value: 'right'}
+              ]
             }]
         }
 
@@ -453,12 +474,18 @@ tinymce.PluginManager.add('reasonimage', function(editor, url) {
           controls_to_bind = {
             src: 'src',
             alt: ['alt', 'alt_2'],
-            size: 'size',
+            align: ['align', 'align_2'],
+            size: 'size'
           };
           reasonPlugins(controls_to_bind, target_panel,  'image', e);
         },
         onSubmit: function(e) {
           var data = win.toJSON();
+          if (!data.src)
+            return;
+
+          if (data.align == "none")
+            delete data.align;
 
           if (imgElm) {
             dom.setAttribs(imgElm, data);
