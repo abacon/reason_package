@@ -28,9 +28,9 @@
   *       elements.
   * TODO: use reason_http_base_path to reduce size of JSON being requested.
   *
-  * @param Object controlSelectors The items to which the the picker will be bound
-  * @param String targetPanelSelector The item to which the the picker will be bound
-  * @param String type 'image' or 'link'; determines which plugin to use
+  * @param {Object} controlSelectors The items to which the the picker will be bound
+  * @param {String} targetPanelSelector The item to which the the picker will be bound
+  * @param {String} type 'image' or 'link'; determines which plugin to use
   **/
 reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
   var currentReasonPlugin;
@@ -48,9 +48,9 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
  * For example, jsonURL(15, 6, 'image') should return a URL for the sixteenth
  * to the twenty-second images of the list.
  *
- * @param Integer offset     the index of the first item to fetch
- * @param Integer chunk_size the number of items to fetch
- * @param String  type       the type of items to fetch, i.e. image or link
+ * @param {Integer} offset     the index of the first item to fetch
+ * @param {Integer} chunk_size the number of items to fetch
+ * @param {String}  type       the type of items to fetch, i.e. image or link
  */
   reasonPlugins.jsonURL = function (offset, chunk_size, type) {
     var site_id = tinymce.activeEditor.settings.reason_site_id,
@@ -62,7 +62,7 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
   /**
    * Returns the tinyMCE control object for a given tinymce control name.
    *
-   * @param String selector the 'name' value of a tinymce control
+   * @param {String} selector the 'name' value of a tinymce control
    **/
   reasonPlugins.getControl = function (selector) {
     return tinymce.activeEditor.windowManager.windows[0].find('#' + selector)[0];
@@ -73,7 +73,7 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
    * This code is pretty fragile, but could be improved to be more robust.
    * The fundamental consideration re: fragility is: "What is my containing element?" or,
    * more specifically, "Where do I want to put the ReasonPlugin controls?"
-   * @param string selector the selector for the file browser control
+   * @param {String} selector the selector for the file browser control
    **/
   reasonPlugins.getPanel = function (control) {
     return control.parent().parent();
@@ -223,8 +223,8 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
   /**
    * Searches this.items for ReasonImageDialogItems that contain a search
    * term in their keywords, title, or description.
-   * @param String q The string to look for in items
-   * @return Array an array of matching ReasonImageDialogItems
+   * @param {String} q The string to look for in items
+   * @return {Array} an array of matching ReasonImageDialogItems
    **/
   reasonPlugins.reasonImage.prototype.findImagesWithText = function (q) {
     var result = [],
@@ -243,7 +243,7 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
   /**
    * Links reason controls (selecting an image, writing alt text) to hidden
    * tinyMCE elements.
-   * @param HTMLDivElement image_item the div that contains the image
+   * @param {HTMLDivElement} image_item the div that contains the image
    */
   reasonPlugins.reasonImage.prototype.selectImage = function (image_item) {
     var src = image_item.getElementsByTagName('IMG')[0].src;
@@ -283,7 +283,7 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
    * this.imagesListBox.innerHTML. If there is no array provided,
    * renders the first page of result from the current context (images or
    * search results).
-   * @param Array images_array
+   * @param {Array} images_array
    **/
   reasonPlugins.reasonImage.prototype.display_images = function (images_array) {
     var imagesHTML = "";
@@ -313,7 +313,7 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
   /**
    * Given a response, constructs ReasonImageDialogItems and pushes
    * each one onto the this.items array.
-   * @param String response the JSON string that contains the items
+   * @param {String} response the JSON string that contains the items
    **/
   reasonPlugins.reasonImage.prototype.parse_images = function(response) {
     var parsed_response = JSON.parse(response), response_items = parsed_response.items;
@@ -336,9 +336,9 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
    * Fetches all of the images that belong to or are borrowed from a site,
    * via ajax as a series of chunks of size this.chunk_size, and executes
    * a callback after the first chunk finishes downloading.
-   * @param Number   chunk    the number of the chunk to get. Used for calculating 
+   * @param {Number}   chunk    the number of the chunk to get. Used for calculating 
    *                          offset.
-   * @param Function callback a function to be executed when the chunk has finished
+   * @param {Function} callback a function to be executed when the chunk has finished
    *                          being downloaded and parsed.
    **/
   reasonPlugins.reasonImage.prototype.fetch_images = function (chunk, callback) {
