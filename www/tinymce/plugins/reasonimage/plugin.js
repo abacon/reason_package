@@ -57,7 +57,7 @@ ReasonPlugin.prototype.jsonURL = function (offset, chunk_size, type) {
  * @param {String} selector the 'name' value of a tinymce control
  **/
 ReasonPlugin.prototype.getControl = function (selector) {
-  return tinymce.activeEditor.windowManager.windows[0].find('#' + selector)[0];
+  return this.window.find('#' + selector)[0];
 };
 
 ReasonPlugin.prototype.getWindow = function(windowName) {
@@ -243,7 +243,7 @@ ReasonImage.prototype.bindReasonUI = function() {
 
   tinymce.DOM.bind(this.searchBox, 'keyup', function(e) {
     var target = e.target || window.event.srcElement;
-    ReasonPlugin.delay(function() {
+    self.delay(function() {
       if (target.value) {
         self.result = self.findItemsWithText(target.value);
         self.displayedItems = self.result;
