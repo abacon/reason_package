@@ -19,8 +19,8 @@
  * TODO: json_generator should take the unique name of the type, not the type ID.
  * TODO: We need to account for having multiple editors per page. I think that maybe
  *       we should cache a reference to the current editor's plugin and check if activeEditor
- *       is the same as the last time reasonPlugins was called?
- * TODO: Change reasonPlugins.getPanel to keep going up elements until we find a
+ *       is the same as the last time ReasonPlugin was called?
+ * TODO: Change ReasonPlugin.getPanel to keep going up elements until we find a
  *       parent of type panel to make it a little more robust.
  * TODO: insertReasonUI should insert a tinymce control of type panel w/ settings.html, maybe?
  * TODO: the plugin should use a real CSS file (not js-css in insertReasonUI)
@@ -33,16 +33,7 @@
  * @param {String} targetPanelSelector The item to which the the picker will be bound
  * @param {String} type 'image' or 'link'; determines which plugin to use
  **/
-reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
-  var currentReasonPlugin;
-
-  if (type === "image") {
-    return new reasonPlugins.reasonImage(controlSelectors, targetPanelSelector);
-  }
-  else if (type === "link") {
-    currentReasonPlugin = '';
-  }
-};
+ReasonPlugin = function () {};
 
 /**
  * jsonURL handles url and query string building for json requests.
@@ -53,7 +44,7 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
  * @param {Number} chunk_size the number of items to fetch
  * @param {String}  type       the type of items to fetch, i.e. image or link
  */
-reasonPlugins.jsonURL = function (offset, chunk_size, type) {
+ReasonPlugin.prototype.jsonURL = function (offset, chunk_size, type) {
   var site_id = tinymce.activeEditor.settings.reason_site_id,
     reason_http_base_path = tinymce.activeEditor.settings.reason_http_base_path;
 
@@ -65,8 +56,18 @@ reasonPlugins.jsonURL = function (offset, chunk_size, type) {
  *
  * @param {String} selector the 'name' value of a tinymce control
  **/
-reasonPlugins.getControl = function (selector) {
+ReasonPlugin.prototype.getControl = function (selector) {
   return tinymce.activeEditor.windowManager.windows[0].find('#' + selector)[0];
+};
+
+ReasonPlugin.prototype.getWindow = function(windowName) {
+  var windows;
+  windows = tinymce.activeEditor.windowManager.windows;
+  for (var i in windows) {
+    if (windows[i].name() == windowName)
+      return windows[i];
+  }
+  return false;
 };
 
 /**
@@ -76,12 +77,12 @@ reasonPlugins.getControl = function (selector) {
  * more specifically, "Where do I want to put the ReasonPlugin controls?"
  * @param {String} control the selector for the file browser control
  **/
-reasonPlugins.getPanel = function (control) {
+ReasonPlugin.prototype.getPanel = function (control) {
   return control.parent().parent();
 };
 
 // From SO: http://stackoverflow.com/questions/1909441/jquery-keyup-delay
-reasonPlugins.delay = (function(){
+ReasonPlugin.prototype.delay = (function(){
   var timer = 0;
   return function(callback, ms){
     clearTimeout (timer);
@@ -90,15 +91,45 @@ reasonPlugins.delay = (function(){
 })();
 
 /**
+ * Searches this.items for ReasonPluginDialogItems that contain a search
+ * term in their keywords, title, or description.
+ * @param {String} q The string to look for in items
+ * @return {Array<ReasonPluginDialogItem>} an array of matching ReasonPluginDialogItems
+ **/
+ReasonPlugin.prototype.findItemsWithText = function (q) {
+  var result = [],
+    list = this.items,
+    regex = new RegExp(q, "i");
+  for (var i in list) {
+    if (list.hasOwnProperty(i)) {
+      if (list[i].hasText(regex)) {
+        result.push(list[i]);
+      }
+    }
+  }
+  return result;
+};
+
+/**
+ * Handles enabling/disabling of "Next Page"/"Previous Page" buttons.
+ * Should be called after every new chunk is loaded, page is displayed,
+ * or search result is calculated.
+ **/
+ReasonPlugin.prototype.updatePagination = function() {
+  var num_of_pages = Math.ceil(this.displayedItems.length/this.pageSize);
+  this.nextButton.disabled = (this.page + 1 > num_of_pages);
+  this.prevButton.disabled = (this.page - 1 <= 0);
+};
+
+/**
  * Dispatch function. Gets a reference to the panel, and does everything we
  * need to do in order to get the plugin up and running.
  */
-reasonPlugins.reasonImage = function(controlSelectors, placeholderSelector) {
-  this.chunk_size = 1000;
-  this.page_size = 6;
+ReasonImage = function(controlSelectors, placeholderSelector) {
+  this.chunkSize = 1000;
+  this.pageSize = 6;
   this.page = 1;
   this.type = "image";
-  this.json_url = reasonPlugins.jsonURL;
   this.items = [];
 
   this.getControlReferences(controlSelectors, placeholderSelector);
@@ -106,28 +137,29 @@ reasonPlugins.reasonImage = function(controlSelectors, placeholderSelector) {
   this.bindReasonUI();
   this.renderReasonImages();
 };
+ReasonImage.prototype = new ReasonPlugin();
 
 
-reasonPlugins.reasonImage.prototype.getControlReferences = function(controlSelectors, placeholderSelector) {
+ReasonImage.prototype.getControlReferences = function(controlSelectors, placeholderSelector) {
   var self = this;
 
-  this.window = this.get_window(controlSelectors.tabPanel);
-  this.targetPanel = this.get_control(placeholderSelector);
-  this.srcControl = this.get_control(controlSelectors.src);
+  this.window = this.getWindow(controlSelectors.tabPanel);
+  this.targetPanel = this.getControl(placeholderSelector);
+  this.srcControl = this.getControl(controlSelectors.src);
   this.altControls = tinymce.map(controlSelectors.alt, function(item) {
-    return self.get_control(item);
+    return self.getControl(item);
   });
   this.alignControls = tinymce.map(controlSelectors.align, function(item) {
-    return self.get_control(item);
+    return self.getControl(item);
   });
-  this.sizeControl = this.get_control(controlSelectors.size);
+  this.sizeControl = this.getControl(controlSelectors.size);
 }
 
 /**
  * Prepends the reason controls to the tinyMCE panel specified by
  * this.targetPanel.
  **/
-reasonPlugins.reasonImage.prototype.insertReasonUI = function() {
+ReasonImage.prototype.insertReasonUI = function() {
   var holderDiv;
   this.UI = this.targetPanel.getEl();
   var css = 'button:disabled, button:disabled:hover, button:disabled:focus, button[disabled=true] { background-image: linear-gradient(to bottom, rgb(222, 222, 222), rgb(184, 184, 184)) !important; color: #aaaaaa; } .items_chunk { text-align: center; height: 300px; white-space: normal;} .image_item {width: 190px; padding: 5px; display: inline-block;} .items_chunk .name, .items_chunk .description {display: block; white-space: normal;} .items_chunk .description {font-size: 0.9em;}' ,
@@ -154,7 +186,7 @@ reasonPlugins.reasonImage.prototype.insertReasonUI = function() {
  * Binds various controls like cancel, next page, and search to their
  * corresponding functions.
  **/
-reasonPlugins.reasonImage.prototype.bindReasonUI = function() {
+ReasonImage.prototype.bindReasonUI = function() {
   var self = this;
 
   this.imagesListBox = this.UI.getElementsByClassName('items_chunk')[0];
@@ -174,21 +206,21 @@ reasonPlugins.reasonImage.prototype.bindReasonUI = function() {
   tinymce.DOM.bind(this.prevButton, 'click', function() {
     var begin, end;
 
-    end = ((self.page - 1) * self.page_size);
-    begin = end - self.page_size;
+    end = ((self.page - 1) * self.pageSize);
+    begin = end - self.pageSize;
 
     self.page -= 1;
-    self.display_images(self.displayedItems.slice(begin, end));
+    self.displayImages(self.displayedItems.slice(begin, end));
   });
 
   tinymce.DOM.bind(this.nextButton, 'click', function() {
     var begin, end;
 
-    begin = (self.page * self.page_size);
-    end = (begin + self.page_size);
+    begin = (self.page * self.pageSize);
+    end = (begin + self.pageSize);
 
     self.page += 1;
-    self.display_images(self.displayedItems.slice(begin, end));
+    self.displayImages(self.displayedItems.slice(begin, end));
   });
 
   this.sizeControl.on('select', function () {
@@ -211,43 +243,31 @@ reasonPlugins.reasonImage.prototype.bindReasonUI = function() {
 
   tinymce.DOM.bind(this.searchBox, 'keyup', function(e) {
     var target = e.target || window.event.srcElement;
-    reasonPlugins.delay(function() {
+    ReasonPlugin.delay(function() {
       if (target.value) {
-        self.result = self.findImagesWithText(target.value);
+        self.result = self.findItemsWithText(target.value);
         self.displayedItems = self.result;
-        self.display_images();
+        self.displayImages();
       } else {
         self.displayedItems = self.items;
-        self.display_images();
+        self.displayImages();
       }
     }, 200);
   });
 };
 
-/**
- * Searches this.items for ReasonImageDialogItems that contain a search
- * term in their keywords, title, or description.
- * @param {String} q The string to look for in items
- * @return {Array} an array of matching ReasonImageDialogItems
- **/
-reasonPlugins.reasonImage.prototype.findImagesWithText = function (q) {
-  var result = [],
-    list = this.items,
-    regex = new RegExp(q, "i");
-  for (var i in list) {
-    if (list.hasOwnProperty(i)) {
-      if (list[i].hasText(regex)) {
-        result.push(list[i]);
-      }
-    }
+ReasonImage.prototype.switchToTab = function(tabName) {
+  if (tabName === "reason") {
+    this.window.find("tabpanel")[0].activateTab(0);
+  } else {
+    this.window.find("tabpanel")[0].activateTab(1);
   }
-  return result;
 };
 
-reasonPlugins.reasonImage.prototype.find_page_with_url = function(image_url) {
+ReasonImage.prototype.findPageWithUrl = function(image_url) {
   for (var i = 0; i < this.items.length; i++) {
     if (this.items[i].URLs.thumbnail == image_url || this.items[i].URLs.full == image_url) {
-      return Math.ceil((i+1) / this.page_size);
+      return Math.ceil((i+1) / this.pageSize);
     }
   }
   return false;
@@ -258,7 +278,7 @@ reasonPlugins.reasonImage.prototype.find_page_with_url = function(image_url) {
  * tinyMCE elements.
  * @param {HTMLDivElement} image_item the div that contains the image
  */
-reasonPlugins.reasonImage.prototype.selectImage = function (image_item) {
+ReasonImage.prototype.selectImage = function (image_item) {
   tinymce.each(this.window.getEl().getElementsByClassName("selectedImage"), function(v) {v.className = v.className.replace("selectedImage",""); });
   image_item.className += " selectedImage";
   var src = image_item.getElementsByTagName('IMG')[0].src;
@@ -275,7 +295,7 @@ reasonPlugins.reasonImage.prototype.selectImage = function (image_item) {
  * @param {String} size
  */
 
-reasonPlugins.reasonImage.prototype.setImageSize = function (size) {
+ReasonImage.prototype.setImageSize = function (size) {
   this.imageSize = size;
   var curVal = this.srcControl.value(),
     reason_http_base_path = tinymce.activeEditor.settings.reason_http_base_path;
@@ -293,10 +313,10 @@ reasonPlugins.reasonImage.prototype.setImageSize = function (size) {
   }
 };
 
-reasonPlugins.reasonImage.prototype.renderReasonImages = function () {
-  this.fetch_images(1, function() {
+ReasonImage.prototype.renderReasonImages = function () {
+  this.fetchImages(1, function() {
     this.displayedItems = this.items;
-    this.display_images();
+    this.displayImages();
   });
 };
 
@@ -307,37 +327,18 @@ reasonPlugins.reasonImage.prototype.renderReasonImages = function () {
  * search results).
  * @param {Array<ReasonImageDialogItem>} images_array
  **/
-reasonPlugins.reasonImage.prototype.display_images = function (images_array) {
+ReasonImage.prototype.displayImages = function (images_array) {
   var imagesHTML = "";
 
-  images_array = (!images_array && this.displayedItems) ? this.displayedItems.slice(0, this.page_size) : images_array;
+  images_array = (!images_array && this.displayedItems) ? this.displayedItems.slice(0, this.pageSize) : images_array;
 
   for (var i in images_array) {
     i = images_array[i];
-    imagesHTML += i.display_item();
+    imagesHTML += i.displayItem();
   }
 
   this.imagesListBox.innerHTML = imagesHTML;
-  this.update_pagination();
-};
-
-/**
- * Handles enabling/disabling of "Next Page"/"Previous Page" buttons.
- * Should be called after every new chunk is loaded, page is displayed,
- * or search result is calculated.
- **/
-reasonPlugins.reasonImage.prototype.update_pagination = function() {
-  var num_of_pages = Math.ceil(this.displayedItems.length/this.page_size);
-  this.nextButton.disabled = (this.page + 1 > num_of_pages);
-  this.prevButton.disabled = (this.page - 1 <= 0);
-};
-
-reasonPlugins.reasonImage.prototype.switch_to_tab = function(tabName) {
-  if (tabName === "reason") {
-    this.window.find("tabpanel")[0].activateTab(0);
-  } else {
-    this.window.find("tabpanel")[0].activateTab(1);
-  }
+  this.updatePagination();
 };
 
 /**
@@ -345,7 +346,7 @@ reasonPlugins.reasonImage.prototype.switch_to_tab = function(tabName) {
  * each one onto the this.items array.
  * @param {String} response the JSON string that contains the items
  **/
-reasonPlugins.reasonImage.prototype.parse_images = function(response) {
+ReasonImage.prototype.parseImages = function(response) {
   var parsed_response = JSON.parse(response), response_items = parsed_response.items, item;
 
   this.totalItems = parsed_response.count;
@@ -364,42 +365,44 @@ reasonPlugins.reasonImage.prototype.parse_images = function(response) {
 
 /**
  * Fetches all of the images that belong to or are borrowed from a site,
- * via ajax as a series of chunks of size this.chunk_size, and executes
+ * via ajax as a series of chunks of size this.chunkSize, and executes
  * a callback after the first chunk finishes downloading.
  * @param {Number}   chunk    the number of the chunk to get. Used for calculating
  *                          offset.
  * @param {Function} callback a function to be executed when the chunk has finished
  *                          being downloaded and parsed.
  **/
-reasonPlugins.reasonImage.prototype.fetch_images = function (chunk, callback) {
+ReasonImage.prototype.fetchImages = function (chunk, callback) {
   if (this.closed)
     return;
 
-  if (!this.json_url)
+  if (!this.jsonURL)
     throw "You need to set a URL for the dialog to fetch JSON from.";
 
-  var offset = ((chunk - 1) * this.chunk_size), url;
+  var offset = ((chunk - 1) * this.chunkSize), url;
 
-  if (typeof this.json_url === 'function')
+  if (typeof this.jsonURL === 'function')
   {
-    url = this.json_url(offset, this.chunk_size, this.type);
+    url = this.jsonURL(offset, this.chunkSize, this.type);
   } else
-    url = this.json_url;
+    url = this.jsonURL;
 
   tinymce.util.XHR.send({
     "url": url,
     "success": function(response) {
-      this.parse_images(response, chunk);
+      this.parseImages(response, chunk);
       callback.call(this);
-      if (chunk+1 <= this.totalItems/this.chunk_size)
-        this.fetch_images(chunk+1, function() {});
+      if (chunk+1 <= this.totalItems/this.chunkSize)
+        this.fetchImages(chunk+1, function() {});
     },
     "success_scope": this
   });
 };
 
+var ReasonPluginDialogItem = function() {};
 
 var ReasonImageDialogItem = function () {};
+ReasonImageDialogItem.prototype = new ReasonPluginDialogItem();
 ReasonImageDialogItem.prototype.escapeHtml = function (unsafe) {
   return unsafe
     .replace(/&/g, "&amp;")
@@ -422,7 +425,7 @@ ReasonImageDialogItem.prototype.hasText = function(q) {
 ReasonImageDialogItem.prototype.description = '';
 
 
-ReasonImageDialogItem.prototype.render_item = function () {
+ReasonImageDialogItem.prototype.renderItem = function () {
   var size, description;
   size = 'thumbnail';
   description = this.escapeHtml(this.description);
@@ -431,12 +434,13 @@ ReasonImageDialogItem.prototype.render_item = function () {
     '" alt="' + description + '"></img>';
 };
 
-ReasonImageDialogItem.prototype.display_item = function () {
-  return '<a id="reasonimage_' + this.id + '" class="image_item"><span class="name">' + this.escapeHtml(this.name) + '</span>' + this.render_item() + '<span class="description">' + this.escapeHtml(this.description) + '</span></a>';
+ReasonImageDialogItem.prototype.displayItem = function () {
+  return '<a id="reasonimage_' + this.id + '" class="image_item"><span class="name">' + this.escapeHtml(this.name) + '</span>' + this.renderItem() + '<span class="description">' + this.escapeHtml(this.description) + '</span></a>';
 };
 
 
-reasonPlugins.reasonLink = function() {};
+ReasonLink = function() {};
+ReasonLink.prototype = new ReasonPlugin();
 
 
 
@@ -465,6 +469,7 @@ tinymce.PluginManager.add('reasonimage', function(editor, url) {
 
     win = editor.windowManager.open({
       title: 'Add an image',
+      name: 'reasonImageWindow',
       body: [
         // Add from Reason
         {
@@ -517,13 +522,14 @@ tinymce.PluginManager.add('reasonimage', function(editor, url) {
       bodyType: 'tabpanel',
       onPostRender: function(e) {
         var target_panel = 'reasonImagePanel',
-        controls_to_bind = {
-          src: 'src',
-          alt: ['alt', 'alt_2'],
-          align: ['align', 'align_2'],
-          size: 'size'
-        };
-        reasonImagePlugin = reasonPlugins(controls_to_bind, target_panel,  'image', e);
+          controls_to_bind = {
+            tabPanel: "reasonImageWindow",
+            src: 'src',
+            alt: ['alt', 'alt_2'],
+            align: ['align', 'align_2'],
+            size: 'size'
+          };
+        reasonImagePlugin = new ReasonImage(controls_to_bind, target_panel,  'image', e);
       },
       onSubmit: function() {
         var data = win.toJSON();
