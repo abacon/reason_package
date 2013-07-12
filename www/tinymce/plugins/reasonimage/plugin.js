@@ -48,8 +48,8 @@ reasonPlugins = function (controlSelectors, targetPanelSelector, type) {
  * For example, jsonURL(15, 6, 'image') should return a URL for the sixteenth
  * to the twenty-second images of the list.
  *
- * @param {Integer} offset     the index of the first item to fetch
- * @param {Integer} chunk_size the number of items to fetch
+ * @param {Number} offset     the index of the first item to fetch
+ * @param {Number} chunk_size the number of items to fetch
  * @param {String}  type       the type of items to fetch, i.e. image or link
  */
 reasonPlugins.jsonURL = function (offset, chunk_size, type) {
@@ -73,7 +73,7 @@ reasonPlugins.getControl = function (selector) {
  * This code is pretty fragile, but could be improved to be more robust.
  * The fundamental consideration re: fragility is: "What is my containing element?" or,
  * more specifically, "Where do I want to put the ReasonPlugin controls?"
- * @param {String} selector the selector for the file browser control
+ * @param {String} control the selector for the file browser control
  **/
 reasonPlugins.getPanel = function (control) {
   return control.parent().parent();
@@ -151,9 +151,7 @@ reasonPlugins.reasonImage.prototype.insertReasonUI = function() {
 reasonPlugins.reasonImage.prototype.bindReasonUI = function() {
   var self = this;
 
-  this.reasonImageControls = this.UI.getElementsByClassName('reasonImage')[0];
   this.imagesListBox = this.UI.getElementsByClassName('items_chunk')[0];
-  this.CancelButton = this.UI.getElementsByClassName('cancelReasonImage')[0];
   this.prevButton = this.UI.getElementsByClassName('prevImagePage')[0];
   this.nextButton = this.UI.getElementsByClassName('nextImagePage')[0];
   this.searchBox = this.UI.getElementsByClassName('reasonImageSearch')[0];
@@ -167,7 +165,7 @@ reasonPlugins.reasonImage.prototype.bindReasonUI = function() {
       self.selectImage( target.parentElement );
   });
 
-  tinymce.DOM.bind(this.prevButton, 'click', function(e) {
+  tinymce.DOM.bind(this.prevButton, 'click', function() {
     var begin, end;
 
     end = ((self.page - 1) * self.page_size);
@@ -177,7 +175,7 @@ reasonPlugins.reasonImage.prototype.bindReasonUI = function() {
     self.display_images(self.displayedItems.slice(begin, end));
   });
 
-  tinymce.DOM.bind(this.nextButton, 'click', function(e) {
+  tinymce.DOM.bind(this.nextButton, 'click', function() {
     var begin, end;
 
     begin = (self.page * self.page_size);
@@ -187,14 +185,14 @@ reasonPlugins.reasonImage.prototype.bindReasonUI = function() {
     self.display_images(self.displayedItems.slice(begin, end));
   });
 
-  this.sizeControl.on('select', function (e) {
+  this.sizeControl.on('select', function () {
     self.setImageSize(self.sizeControl.value());
   });
 
-  this.altControls[0].on('change', function(e) {
+  this.altControls[0].on('change', function() {
     self.altControls[1].value(self.altControls[0].value());
   });
-  this.altControls[1].on('change', function(e) {
+  this.altControls[1].on('change', function() {
     self.altControls[0].value(self.altControls[1].value());
   });
 
@@ -250,7 +248,7 @@ reasonPlugins.reasonImage.prototype.selectImage = function (image_item) {
   if (!!this.imageSize && this.imageSize == 'full')
     src = src.replace("_tn", "_orig");
   this.srcControl.value(src);
-  tinymce.each(this.altControls, function(v, i) {v.value(image_item.getElementsByClassName('name')[0].innerHTML);});
+  tinymce.each(this.altControls, function(v) {v.value(image_item.getElementsByClassName('name')[0].innerHTML);});
 };
 
 reasonPlugins.reasonImage.prototype.setImageSize = function (size) {
@@ -393,8 +391,8 @@ ReasonImageDialogItem.prototype.description = '';
 
 
 ReasonImageDialogItem.prototype.render_item = function () {
-  size = 'thumbnail';
-  description = this.escapeHtml(this.description);
+  var size = 'thumbnail';
+  var description = this.escapeHtml(this.description);
   return '<img ' +
     'src="' + this.URLs[size] +
     '" alt="' + description + '"></img>';
@@ -485,7 +483,7 @@ tinymce.PluginManager.add('reasonimage', function(editor, url) {
       ],
       bodyType: 'tabpanel',
       onPostRender: function(e) {
-        target_panel = 'reasonImagePanel';
+        var target_panel = 'reasonImagePanel',
         controls_to_bind = {
           src: 'src',
           alt: ['alt', 'alt_2'],
@@ -494,7 +492,7 @@ tinymce.PluginManager.add('reasonimage', function(editor, url) {
         };
         reasonImagePlugin = reasonPlugins(controls_to_bind, target_panel,  'image', e);
       },
-      onSubmit: function(e) {
+      onSubmit: function() {
         var data = win.toJSON();
         if (!data.src)
           return;
@@ -510,7 +508,7 @@ tinymce.PluginManager.add('reasonimage', function(editor, url) {
 
         reasonImagePlugin.closed = true;
       },
-      onClose: function(e) {
+      onClose: function() {
 
         reasonImagePlugin.closed = true;
       }
