@@ -27,6 +27,7 @@
  * TODO: to style each element, insertReasonUI should copy styles/classes from native tinymce
  *       elements.
  * TODO: use reason_http_base_path to reduce size of JSON being requested.
+ * TODO: !IMPORTANT fix the prototype chain. ReasonImage should inherit from ReasonPlugins, maybe?
  *
  * @param {Object} controlSelectors The items to which the the picker will be bound
  * @param {String} targetPanelSelector The item to which the the picker will be bound
@@ -88,7 +89,6 @@ reasonPlugins.delay = (function(){
   };
 })();
 
-
 /**
  * Dispatch function. Gets a reference to the panel, and does everything we
  * need to do in order to get the plugin up and running.
@@ -97,25 +97,31 @@ reasonPlugins.reasonImage = function(controlSelectors, placeholderSelector) {
   this.chunk_size = 1000;
   this.page_size = 6;
   this.page = 1;
-  this.srcControl = reasonPlugins.getControl(controlSelectors.src);
-  this.altControls = tinymce.map(controlSelectors.alt, function(item) {
-    return reasonPlugins.getControl(item);
-  });
-  this.alignControls = tinymce.map(controlSelectors.align, function(item) {
-    return reasonPlugins.getControl(item);
-  });
-  this.sizeControl = reasonPlugins.getControl(controlSelectors.size);
-  this.targetPanel = reasonPlugins.getControl(placeholderSelector);
   this.type = "image";
   this.json_url = reasonPlugins.jsonURL;
   this.items = [];
 
+  this.getControlReferences(controlSelectors, placeholderSelector);
   this.insertReasonUI();
   this.bindReasonUI();
   this.renderReasonImages();
 };
 
 
+reasonPlugins.reasonImage.prototype.getControlReferences = function(controlSelectors, placeholderSelector) {
+  var self = this;
+
+  this.window = this.get_window(controlSelectors.tabPanel);
+  this.targetPanel = this.get_control(placeholderSelector);
+  this.srcControl = this.get_control(controlSelectors.src);
+  this.altControls = tinymce.map(controlSelectors.alt, function(item) {
+    return self.get_control(item);
+  });
+  this.alignControls = tinymce.map(controlSelectors.align, function(item) {
+    return self.get_control(item);
+  });
+  this.sizeControl = this.get_control(controlSelectors.size);
+}
 
 /**
  * Prepends the reason controls to the tinyMCE panel specified by
@@ -238,18 +244,36 @@ reasonPlugins.reasonImage.prototype.findImagesWithText = function (q) {
   return result;
 };
 
+reasonPlugins.reasonImage.prototype.find_page_with_url = function(image_url) {
+  for (var i = 0; i < this.items.length; i++) {
+    if (this.items[i].URLs.thumbnail == image_url || this.items[i].URLs.full == image_url) {
+      return Math.ceil((i+1) / this.page_size);
+    }
+  }
+  return false;
+};
+
 /**
  * Links reason controls (selecting an image, writing alt text) to hidden
  * tinyMCE elements.
  * @param {HTMLDivElement} image_item the div that contains the image
  */
 reasonPlugins.reasonImage.prototype.selectImage = function (image_item) {
+  tinymce.each(this.window.getEl().getElementsByClassName("selectedImage"), function(v) {v.className = v.className.replace("selectedImage",""); });
+  image_item.className += " selectedImage";
   var src = image_item.getElementsByTagName('IMG')[0].src;
   if (!!this.imageSize && this.imageSize == 'full')
-    src = src.replace("_tn", "_orig");
+    src = src.replace("_tn", "");
   this.srcControl.value(src);
   tinymce.each(this.altControls, function(v) {v.value(image_item.getElementsByClassName('name')[0].innerHTML);});
 };
+
+/**
+ * setImageSize is used to do some string voodoo on the src attribute. Call it whenever
+ * src or the image size is changed.
+ *
+ * @param {String} size
+ */
 
 reasonPlugins.reasonImage.prototype.setImageSize = function (size) {
   this.imageSize = size;
@@ -281,7 +305,7 @@ reasonPlugins.reasonImage.prototype.renderReasonImages = function () {
  * this.imagesListBox.innerHTML. If there is no array provided,
  * renders the first page of result from the current context (images or
  * search results).
- * @param {Array} images_array
+ * @param {Array<ReasonImageDialogItem>} images_array
  **/
 reasonPlugins.reasonImage.prototype.display_images = function (images_array) {
   var imagesHTML = "";
@@ -308,13 +332,21 @@ reasonPlugins.reasonImage.prototype.update_pagination = function() {
   this.prevButton.disabled = (this.page - 1 <= 0);
 };
 
+reasonPlugins.reasonImage.prototype.switch_to_tab = function(tabName) {
+  if (tabName === "reason") {
+    this.window.find("tabpanel")[0].activateTab(0);
+  } else {
+    this.window.find("tabpanel")[0].activateTab(1);
+  }
+};
+
 /**
  * Given a response, constructs ReasonImageDialogItems and pushes
  * each one onto the this.items array.
  * @param {String} response the JSON string that contains the items
  **/
 reasonPlugins.reasonImage.prototype.parse_images = function(response) {
-  var parsed_response = JSON.parse(response), response_items = parsed_response.items;
+  var parsed_response = JSON.parse(response), response_items = parsed_response.items, item;
 
   this.totalItems = parsed_response.count;
 
@@ -391,8 +423,9 @@ ReasonImageDialogItem.prototype.description = '';
 
 
 ReasonImageDialogItem.prototype.render_item = function () {
-  var size = 'thumbnail';
-  var description = this.escapeHtml(this.description);
+  var size, description;
+  size = 'thumbnail';
+  description = this.escapeHtml(this.description);
   return '<img ' +
     'src="' + this.URLs[size] +
     '" alt="' + description + '"></img>';
@@ -509,7 +542,6 @@ tinymce.PluginManager.add('reasonimage', function(editor, url) {
         reasonImagePlugin.closed = true;
       },
       onClose: function() {
-
         reasonImagePlugin.closed = true;
       }
     });
