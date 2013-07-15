@@ -278,6 +278,9 @@ ReasonImage.prototype.setAlt = function(alt) {
 ReasonImage.prototype.setAlign = function(align) {
   tinymce.each(this.alignControls, function(v) {v.value(align);});
 };
+ReasonImage.prototype.setSrc = function(src) {
+  this.srcControl.value(src);
+};
 ReasonImage.prototype.deduceSize = function(url) {
     if (url.search("_tn.") != -1)
       return "thumbnail";
@@ -333,7 +336,7 @@ ReasonImage.prototype.selectImage = function (image_item) {
   if (!!this.imageSize && this.imageSize == 'full')
     src = src.replace("_tn", "");
 
-  this.srcControl.value(src);
+  this.setSrc(src);
   this.setAlt(image_item.getElementsByClassName('name')[0].innerHTML);
   return true;
 };
@@ -595,6 +598,7 @@ tinymce.PluginManager.add('reasonimage', function(editor, url) {
           reasonImagePlugin.switchToTab("URL");
           reasonImagePlugin.setAlign(imgElm.align);
           reasonImagePlugin.setAlt(imgElm.alt);
+          reasonImagePlugin.setSrc(imgElm.src);
           reasonImagePlugin.whenLoaded(function() {
             if (this.selectImage(imgElm.src)) {
               this.setImageSize(this.deduceSize(imgElm.src));
