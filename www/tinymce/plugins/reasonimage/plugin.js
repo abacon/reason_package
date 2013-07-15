@@ -26,14 +26,16 @@
  * TODO: the plugin should use a real CSS file (not js-css in insertReasonUI)
  * TODO: to style each element, insertReasonUI should copy styles/classes from native tinymce
  *       elements.
+ * TODO: A selected image's highlight doesn't persist between renders of the page of results.
  * TODO: use reason_http_base_path to reduce size of JSON being requested.
- * TODO: !IMPORTANT fix the prototype chain. ReasonImage should inherit from ReasonPlugins, maybe?
  *
  * @param {Object} controlSelectors The items to which the the picker will be bound
  * @param {String} targetPanelSelector The item to which the the picker will be bound
  * @param {String} type 'image' or 'link'; determines which plugin to use
  **/
-ReasonPlugin = function () {};
+ReasonPlugin = function () {
+  this.whenLoadedFuncs = [];
+};
 
 /**
  * jsonURL handles url and query string building for json requests.
@@ -121,6 +123,22 @@ ReasonPlugin.prototype.updatePagination = function() {
   this.prevButton.disabled = (this.page - 1 <= 0);
 };
 
+ReasonPlugin.prototype.makePageSlice = function(page_num) {
+  var begin, end;
+
+  begin = ((page_num - 1) * this.pageSize);
+  end = begin + this.pageSize;
+  return this.displayedItems.slice(begin, end);
+}
+
+ReasonPlugin.prototype.loaded = function() {
+  var self = this;
+  tinymce.each(this.whenLoadedFuncs, function(v) {v.call(self);});
+}
+ReasonPlugin.prototype.whenLoaded = function(func_to_add) {
+  this.whenLoadedFuncs.push(func_to_add);
+};
+
 /**
  * Dispatch function. Gets a reference to the panel, and does everything we
  * need to do in order to get the plugin up and running.
@@ -162,7 +180,7 @@ ReasonImage.prototype.getControlReferences = function(controlSelectors, placehol
 ReasonImage.prototype.insertReasonUI = function() {
   var holderDiv;
   this.UI = this.targetPanel.getEl();
-  var css = 'button:disabled, button:disabled:hover, button:disabled:focus, button[disabled=true] { background-image: linear-gradient(to bottom, rgb(222, 222, 222), rgb(184, 184, 184)) !important; color: #aaaaaa; } .items_chunk { text-align: center; height: 300px; white-space: normal;} .image_item {width: 190px; padding: 5px; display: inline-block;} .items_chunk .name, .items_chunk .description {display: block; white-space: normal;} .items_chunk .description {font-size: 0.9em;}' ,
+  var css = '.selectedImage {background-image: linear-gradient(to bottom, rgb(222, 222, 222), rgb(184, 184, 184)); } button:disabled, button:disabled:hover, button:disabled:focus, button[disabled=true] { background-image: linear-gradient(to bottom, rgb(222, 222, 222), rgb(184, 184, 184)) !important; color: #aaaaaa; } .items_chunk { text-align: center; height: 300px; white-space: normal;} .image_item {width: 190px; padding: 5px; display: inline-block;} .items_chunk .name, .items_chunk .description {display: block; white-space: normal;} .items_chunk .description {font-size: 0.9em;}' ,
     head = document.getElementsByTagName('head')[0],
     style = document.createElement('style');
 
@@ -204,23 +222,13 @@ ReasonImage.prototype.bindReasonUI = function() {
   });
 
   tinymce.DOM.bind(this.prevButton, 'click', function() {
-    var begin, end;
-
-    end = ((self.page - 1) * self.pageSize);
-    begin = end - self.pageSize;
-
     self.page -= 1;
-    self.displayImages(self.displayedItems.slice(begin, end));
+    self.displayImages(self.makePageSlice(self.page));
   });
 
   tinymce.DOM.bind(this.nextButton, 'click', function() {
-    var begin, end;
-
-    begin = (self.page * self.pageSize);
-    end = (begin + self.pageSize);
-
     self.page += 1;
-    self.displayImages(self.displayedItems.slice(begin, end));
+    self.displayImages(self.makePageSlice(self.page));
   });
 
   this.sizeControl.on('select', function () {
@@ -228,17 +236,17 @@ ReasonImage.prototype.bindReasonUI = function() {
   });
 
   this.altControls[0].on('change', function() {
-    self.altControls[1].value(self.altControls[0].value());
+    self.setAlt(self.altControls[0].value());
   });
   this.altControls[1].on('change', function() {
-    self.altControls[0].value(self.altControls[1].value());
+    self.setAlt(self.altControls[1].value());
   });
 
   this.alignControls[0].on('select', function(e) {
-    self.alignControls[1].value(e.control.value());
+    self.setAlign(e.control.value());
   });
   this.alignControls[1].on('select', function(e) {
-    self.alignControls[0].value(e.control.value());
+    self.setAlign(e.control.value());
   });
 
   tinymce.DOM.bind(this.searchBox, 'keyup', function(e) {
@@ -264,7 +272,20 @@ ReasonImage.prototype.switchToTab = function(tabName) {
   }
 };
 
-ReasonImage.prototype.findPageWithUrl = function(image_url) {
+ReasonImage.prototype.setAlt = function(alt) {
+  tinymce.each(this.altControls, function(v) {v.value(alt);});
+};
+ReasonImage.prototype.setAlign = function(align) {
+  tinymce.each(this.alignControls, function(v) {v.value(align);});
+};
+ReasonImage.prototype.deduceSize = function(url) {
+    if (url.search("_tn.") != -1)
+      return "thumbnail";
+    else
+      return "full";
+};
+
+ReasonImage.prototype.findPageWith = function(image_url) {
   for (var i = 0; i < this.items.length; i++) {
     if (this.items[i].URLs.thumbnail == image_url || this.items[i].URLs.full == image_url) {
       return Math.ceil((i+1) / this.pageSize);
@@ -273,19 +294,53 @@ ReasonImage.prototype.findPageWithUrl = function(image_url) {
   return false;
 };
 
+ReasonImage.prototype.displayPageWith = function (image_url) {
+  var thePage = this.findPageWith(image_url);
+  if (!thePage)
+    return false;
+  else {
+    this.displayImages(this.makePageSlice(this.findPageWith(image_url)));
+    return true;
+  }
+};
+
+ReasonImage.prototype.findImageItemOnPage = function (image_item) {
+  var images = this.targetPanel.getEl().getElementsByTagName("IMG");
+  for (var i in images) {
+    if (images[i].src == image_item || images[i].src.replace("_tn", "") == image_item) {
+      return images[i].parentNode;
+    }
+  }
+};
+
 /**
  * Links reason controls (selecting an image, writing alt text) to hidden
  * tinyMCE elements.
- * @param {HTMLDivElement} image_item the div that contains the image
+ * @param {HTMLDivElement|String} image_item the div that contains the image
  */
 ReasonImage.prototype.selectImage = function (image_item) {
-  tinymce.each(this.window.getEl().getElementsByClassName("selectedImage"), function(v) {v.className = v.className.replace("selectedImage",""); });
-  image_item.className += " selectedImage";
+  if (typeof image_item == "string") {
+    if (this.displayPageWith(image_item)) {
+      image_item = this.findImageItemOnPage(image_item);
+      this.switchToTab("reason");
+    } else
+      return false;
+  };
+
+  this.highlightImage(image_item);
+
   var src = image_item.getElementsByTagName('IMG')[0].src;
   if (!!this.imageSize && this.imageSize == 'full')
     src = src.replace("_tn", "");
+
   this.srcControl.value(src);
-  tinymce.each(this.altControls, function(v) {v.value(image_item.getElementsByClassName('name')[0].innerHTML);});
+  this.setAlt(image_item.getElementsByClassName('name')[0].innerHTML);
+  return true;
+};
+
+ReasonImage.prototype.highlightImage = function(image_item) {
+  tinymce.each(this.window.getEl().getElementsByClassName("selectedImage"), function(v) {v.className = v.className.replace("selectedImage",""); });
+  image_item.className += " selectedImage";
 };
 
 /**
@@ -297,6 +352,10 @@ ReasonImage.prototype.selectImage = function (image_item) {
 
 ReasonImage.prototype.setImageSize = function (size) {
   this.imageSize = size;
+
+  if (this.sizeControl.value() != size)
+    this.sizeControl.value(size);
+
   var curVal = this.srcControl.value(),
     reason_http_base_path = tinymce.activeEditor.settings.reason_http_base_path;
   if (!curVal || curVal.search(reason_http_base_path) == -1)
@@ -330,7 +389,7 @@ ReasonImage.prototype.renderReasonImages = function () {
 ReasonImage.prototype.displayImages = function (images_array) {
   var imagesHTML = "";
 
-  images_array = (!images_array && this.displayedItems) ? this.displayedItems.slice(0, this.pageSize) : images_array;
+  images_array = (!images_array && this.displayedItems) ? this.makePageSlice(1) : images_array;
 
   for (var i in images_array) {
     i = images_array[i];
@@ -394,6 +453,8 @@ ReasonImage.prototype.fetchImages = function (chunk, callback) {
       callback.call(this);
       if (chunk+1 <= this.totalItems/this.chunkSize)
         this.fetchImages(chunk+1, function() {});
+      else
+        this.loaded();
     },
     "success_scope": this
   });
@@ -453,7 +514,7 @@ ReasonLink.prototype = new ReasonPlugin();
 tinymce.PluginManager.add('reasonimage', function(editor, url) {
 
   function showDialog() {
-    var win, data, dom = editor.dom, imgElm = editor.selection.getNode(), reasonImagesPlugin;
+    var win, data, dom = editor.dom, imgElm = editor.selection.getNode(), reasonImagePlugin;
     var width, height;
 
     if (imgElm.nodeName == "IMG" && !imgElm.getAttribute('data-mce-object')) {
@@ -522,22 +583,32 @@ tinymce.PluginManager.add('reasonimage', function(editor, url) {
       bodyType: 'tabpanel',
       onPostRender: function(e) {
         var target_panel = 'reasonImagePanel',
-          controls_to_bind = {
-            tabPanel: "reasonImageWindow",
-            src: 'src',
-            alt: ['alt', 'alt_2'],
-            align: ['align', 'align_2'],
-            size: 'size'
-          };
-        reasonImagePlugin = new ReasonImage(controls_to_bind, target_panel,  'image', e);
+            controls_to_bind = {
+              tabPanel: "reasonImageWindow",
+              src: 'src',
+              alt: ['alt', 'alt_2'],
+              align: ['align', 'align_2'],
+              size: 'size'
+            };
+        reasonImagePlugin = new ReasonImage(controls_to_bind, target_panel, 'image', e);
+        if (imgElm) {
+          reasonImagePlugin.switchToTab("URL");
+          reasonImagePlugin.setAlign(imgElm.align);
+          reasonImagePlugin.setAlt(imgElm.alt);
+          reasonImagePlugin.whenLoaded(function() {
+            if (this.selectImage(imgElm.src)) {
+              this.setImageSize(this.deduceSize(imgElm.src));
+              this.setAlt(imgElm.alt);
+            }
+          });
+        }
       },
       onSubmit: function() {
         var data = win.toJSON();
         if (!data.src)
           return;
 
-        if (data.align == "none")
-          delete data.align;
+        data.align == false && delete data.align;
 
         if (imgElm) {
           dom.setAttribs(imgElm, data);
