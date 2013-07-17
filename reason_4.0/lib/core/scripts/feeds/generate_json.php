@@ -229,8 +229,60 @@ elseif (isset($_GET['type']) && isset($_GET['site_id']))
 		$reasonImagesJson->caching((isset($_GET['caching']))? turn_into_boolean($_GET['caching']) : true);
 		print($reasonImagesJson->run());
 	}
-} 
-else
+  elseif ($type == "siteList" && $site_id == 240618) {
+    $toPrint = <<<EOT
+{
+   "count":3,
+   "sites":[
+      {
+         "name":"The Poop Deck",
+         "id":240618
+      },
+      {
+         "name":"Login",
+         "id":75393
+      },
+      {
+        "name:"AAR Center",
+        "id":111096
+      },
+      {
+         "name":"MASTER ADMIN",
+         "id":5
+      }
+   ]
+}
+EOT;
+    print($toPrint);
+  } elseif ($type == "pageList" && $site_id == 111096) {
+    $toPrint = <<<EOT
+{"pages": [
+  {"name": "Home Page", "url": "/AAR/", "id": 2934},
+  {"name": "Not the Home Page", "id", 394, "url": "/AAR/NotHome"},
+  {"name": "Not even the not-home-page", "id": 192, "url": "/AAR/YetAnother"},
+  {"name": "Fruits", "url": "/AAR/Fruits", "id":494, "pages": [
+    {"name": "Apples", "url": "/AAR/Fruits/Apples", "id": 134, "pages": [
+      {"name": "Fuji", "url": "/AAR/Fruits/Apples/Fuji"},
+      {"name": "Macintosh", "url": "/AAR/Fruits/Apples/Macintosh"},
+    ]},
+    {"name": "Oranges", "url": "/AAR/Fruits/Oranges", "id": 214},
+    {"name": "Bananas", "url": "/AAR/Fruits/Bananas" "id": 223},
+  ]}
+]}
+EOT;
+    print($toPrint);
+  } elseif ($type == "anchorList" && $site_id == 111096 && $page_id == 223) {
+    $toPrint = <<<EOT
+      {"anchors": [
+        {"name": "Some reasonable anchor", hash: "#some-reasonable-anchor"},
+        {"name": "Another reasonable anchor", hash: "#another-reasonable-anchor"},
+        {"name": "Some dumb anchor", hash: "#some-dumb-anchor"},
+        {"name": "an unreasonable anchor", hash: "#an-unreasonable-anchor"}
+      ]}
+EOT;
+    print($toPrint);
+  }
+} else
 {
 	http_response_code(400);
 	echo json_encode(array("error" => 400));
